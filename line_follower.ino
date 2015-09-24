@@ -3,17 +3,15 @@ void calculateIntegral();
 void calculateProportional();
 void readValues();
 #define NUM_SENSORS 8
-#define TIMEOUT 5000
+#define TIMEOUT 300
 #define EMITTER_PIN 53
-#define avgSpeed 255
+#define avgSpeed 200
 int time = 0;
-int pwmA = 3;
-int pwmB = 11;
-int dirA = 12;
-int dirB = 10;
-int kp = 1;
-int kd = 1;
-int ki = 1;
+int pwmA = 3; //rojo+ y negro-
+int pwmB = 2; //rojo+ y negro-
+int kp = 50;
+int kd = 4;
+int ki = .5;
 int error = 0;
 int lastError = 0;
 int proportional = 0;
@@ -25,8 +23,6 @@ void setup(){
   Serial.begin(9600);
   pinMode(pwmA, OUTPUT);
   pinMode(pwmB, OUTPUT);
-  pinMode(dirA, OUTPUT);
-  pinMode(dirB, OUTPUT);
   pinMode(1, OUTPUT);
   for (int i=0; i<5; i++){
       digitalWrite(1, HIGH);
@@ -91,7 +87,7 @@ void readValues(){
   for (int i=0; i<NUM_SENSORS; i++){
   Serial.print(sensorValues[i]);
   Serial.print('\t');
-if(sensorValues[i]>400)
+if(sensorValues[i]>200)
   sensorValues[i]=1;
   else
   sensorValues[i]=0;
