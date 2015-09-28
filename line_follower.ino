@@ -1,131 +1,94 @@
+#include <AFMotor.h>
 #include <QTRSensors.h>
-void calculateIntegral();
-void calculateProportional();
-void readValues();
+#include <Servo.h>
+ 
+AF_DCMotor motor3(3, MOTOR12_8KHZ );
+AF_DCMotor motor4(4, MOTOR12_8KHZ );
+ 
+#define KP .2
+#define KD 5
+#define M3_minumum_hiz 120
+#define M4_minumum_hiz 120
+#define M3_maksimum_hiz 210
+#define M4_maksimum_hiz 210
+#define MIDDLE_SENSOR 4
 #define NUM_SENSORS 8
-#define TIMEOUT 300
+#define TIMEOUT 2500
 #define EMITTER_PIN 53
-#define avgSpeed 200
-int time = 0;
-int pwmA = 3; //rojo+ y negro-
-int pwmB = 2; //rojo+ y negro-
-int kp = 50;
-int kd = 4;
-int ki = .5;
-int error = 0;
-int lastError = 0;
-int proportional = 0;
-int derivative = 0;
-int integral = 0;
-QTRSensorsRC qtrrc((unsigned char[]) {51, 49, 47, 45, 43, 41, 39, 37}, NUM_SENSORS, TIMEOUT, EMITTER_PIN);
+#define DEBUG 0
+Servo mano;
+const int t = 35;
+const int e = 33;
+ 
+QTRSensorsRC qtrrc((unsigned char[]) {51, 49, 47, 45, 43, 41, 39, 37} ,NUM_SENSORS, TIMEOUT, EMITTER_PIN);
+ 
 unsigned int sensorValues[NUM_SENSORS];
-void setup(){
+ 
+void setup() {
+  mano.attach(10);
+  delay(1500);
+  manual_calibration();
+  set_motors(0,0);
+  pinMode(t,OUTPUT);
+  pinMode(e,INPUT);
   Serial.begin(9600);
-  pinMode(pwmA, OUTPUT);
-  pinMode(pwmB, OUTPUT);
-  pinMode(1, OUTPUT);
-  for (int i=0; i<5; i++){
-      digitalWrite(1, HIGH);
-      delay(50);
-      digitalWrite(1, LOW);
-      delay(950);
 }
-  analogWrite(pwmA, avgSpeed);
-  analogWrite(pwmB, avgSpeed);
-}
+
+int lastError = 0;
+int last_proportional = 0;
+int integral = 0;
+
 void loop(){
-  readValues();
-  calculateProportional();
-  derivative = error-lastError;
-  integral += proportional;
-  if(integral > 255){
-    integral=255;
-  };
-  if(integral < -255){
-    integral=-255;
-  };
-int turn = proportional*kp + derivative*kd + integral*ki;
-  if(turn>=255)
-    turn=255;
-  if(turn<=-255)
-    turn=-255;
-  int speedA=0;
-  int speedB=0;
-  if(turn>=0){
-    speedA=avgSpeed;
-    speedB=avgSpeed-turn;
-} else{
-    speedA=avgSpeed+turn;
-    speedB=avgSpeed;
-  }
-  Serial.print("P=");
-  Serial.print(proportional);
-  Serial.print('\t');
-  Serial.print("I=");
-  Serial.print(integral);
-  Serial.print('\t');
-  Serial.print("D=");
-  Serial.print(derivative);
-  Serial.print('\t');
-  Serial.print("Turn=");
-  Serial.print(turn);
-  Serial.print('\t');
+  long duracion, distancia;
+  digitalWrite(t, LOW);
+  delayMicroseconds(2);
+  digitalWrite(t, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(t, LOW);
+  duracion = pulseIn(e,HIGH);
+  distancia = duracion/29.1/2;
+  Serial.println(distancia);
+  mano.write(0);
+  unsigned int sensors[8];
+  int position = qtrrc.readLine(sensors);
+  int error = position - 2000;
+  int motorSpeed = KP * error + KD * (error - lastError);  
+  lastError = error;
+  int leftMotorSpeed = M3_minumum_hiz + motorSpeed;
+  int rightMotorSpeed = M4_minumum_hiz - motorSpeed;
+  // set motor speeds using the two motor speed variables above
+  set_motors(leftMotorSpeed, rightMotorSpeed);
+}
 
-  Serial.print("speedA=");
-  Serial.print(speedA);
-  Serial.print('\t');
-  Serial.print("speedB=");
-  Serial.print(speedB);
-  Serial.print('\t');
-  analogWrite(pwmA, speedA);
-  analogWrite(pwmB, speedB);
-  lastError=error;
-  Serial.println();
+void set_motors(int motor3speed, int motor4speed) {
+  if (motor3speed > M3_maksimum_hiz ) motor3speed = M3_maksimum_hiz; //MAKSİMUM MOTOR 1 HIZ LİMİTİ
+  if (motor4speed > M4_maksimum_hiz ) motor4speed = M4_maksimum_hiz; // MAKSİMUM MOTOR 2 HIZ LİMİTİ
+  if (motor3speed < 0) motor3speed = 0; // MİNIMUMMOTOER 1 HIZ LİMİTİ
+  if (motor4speed < 0) motor4speed = 0; // MİNİMUM MOTOR 2 HIZ LİMİTİ
+  motor3.setSpeed(motor3speed); //1.MOTOR HIZI
+  motor4.setSpeed(motor4speed);// 2.MOTOR HIZI
+  motor3.run(FORWARD); //İLERİ
+  motor4.run(FORWARD); //İLERİ
 }
-void readValues(){
-  qtrrc.read(sensorValues);
-  for (int i=0; i<NUM_SENSORS; i++){
-  Serial.print(sensorValues[i]);
-  Serial.print('\t');
-if(sensorValues[i]>200)
-  sensorValues[i]=1;
-  else
-  sensorValues[i]=0;
-// //
-} }
-void calculateProportional(){
-   int sum = 0;
-   int posLeft = 10;
-   int posRight = 10;
-   for (int i=0; i<NUM_SENSORS/2; i++){
-     sum=sum+sensorValues[i];
-     if(sensorValues[i]==1){
-       posRight=i-3;
-     }
-}
-for (int i=NUM_SENSORS-1; i>=NUM_SENSORS/2; i--){
-     sum=sum+sensorValues[i];
-     if(sensorValues[i]==1){
-       posLeft=i-4;
-     }
-}
-   if(sum>=3){
-     sum=2;
-}
-   if(sum==0){
-     if(lastError<0){
-error=-8;
 
-} else{
-error=8; }
-}
-else if((posLeft!=10)&&(posRight!=10)){
-error=0; }
-     else if(posLeft!=10){
-       error=posLeft*2+sum;
-     }
-       else if(posRight!=10){
-         error=posRight*2-sum;
-       }
-   proportional = error;
-}
+void manual_calibration() {
+  int i;
+  for (i = 0; i < 250; i++){
+    qtrrc.calibrate(QTR_EMITTERS_ON);
+    delay(20);
+ }
+ if (DEBUG) {
+   Serial.begin(9600);
+   for (int i = 0; i < NUM_SENSORS; i++) { 
+     Serial.print(qtrrc.calibratedMinimumOn[i]);
+     Serial.print(' ');
+   }
+   Serial.println();
+   for (int i = 0; i < NUM_SENSORS; i++) {
+     Serial.print(qtrrc.calibratedMaximumOn[i]);
+     Serial.print(' ');
+   }
+   Serial.println();
+   Serial.println();
+ }
+ }
